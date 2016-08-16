@@ -54,6 +54,9 @@ nextId = 1; % ID of the next track
 % Detect moving objects, and track them across video frames.
 while ~isDone(obj.reader)
     frame = readFrame();
+    frame = rgb2gray(frame);
+    frame(frame<0.5) = 0.0;
+    frame = repmat(frame,1,1,3); 
     [centroids, bboxes, mask] = detectObjects(frame);
     predictNewLocationsOfTracks();
     [assignments, unassignedTracks, unassignedDetections] = ...
@@ -80,7 +83,7 @@ end
         % Create a video file reader.
 %         obj.reader = vision.VideoFileReader('atrium.avi');
         path = 'E:\repository\datas\videos\multiballs\';
-        obj.reader = vision.VideoFileReader([path 'left.avi']);
+        obj.reader = vision.VideoFileReader([path 'left-2.avi']);
         
         % Create two video players, one to display the video,
         % and one to display the foreground mask.
@@ -93,13 +96,12 @@ end
         % the background. It outputs a binary mask, where the pixel value
         % of 1 corresponds to the foreground and the value of 0 corresponds
         % to the background.
-        obj.detector = vision.ForegroundDetector('NumGaussians', 3, ...
-            'NumTrainingFrames', 40, 'InitialVariance', 0.05, ...
-            'MinimumBackgroundRatio', 0.7);
+        obj.detector = vision.ForegroundDetector(...
+            'NumTrainingFrames', 40, 'InitialVariance', 0.05);
   
-        
-% % %         obj.detector = vision.ForegroundDetector('NumGaussians', 3, ...
-% % %             'NumTrainingFrames', 40, 'MinimumBackgroundRatio', 0.7);
+% original paras        
+%         obj.detector = vision.ForegroundDetector('NumGaussians', 3, ...
+%             'NumTrainingFrames', 40, 'MinimumBackgroundRatio', 0.7);
         
         % Connected groups of foreground pixels are likely to correspond to moving
         % objects.  The blob analysis System object is used to find such groups
@@ -107,12 +109,16 @@ end
         % characteristics, such as area, centroid, and the bounding box.
         obj.blobAnalyser = vision.BlobAnalysis('AreaOutputPort', true, ...
             'CentroidOutputPort', true, ...
-            'MinimumBlobArea', 70, ...
             'BoundingBoxOutputPort', true,...
-            'MinimumBlobArea', 400);
-% % %         obj.blobAnalyser = vision.BlobAnalysis('AreaOutputPort', false, ...
-% % %     'MinimumBlobArea', 70);
-        
+            'MinimumBlobArea', 70,...
+            'MaximumBlobArea', 1200);
+%         obj.blobAnalyser = vision.BlobAnalysis('AreaOutputPort', false, ...
+%     'MinimumBlobArea', 70);
+% original paras
+%         obj.blobAnalyser = vision.BlobAnalysis('BoundingBoxOutputPort', true, ...
+%             'AreaOutputPort', true, 'CentroidOutputPort', true, ...
+%             'MinimumBlobArea', 400);
+
 % % %         obj.blobAnalyser = vision.BlobAnalysis('BoundingBoxOutputPort', true, ...
 % % %             'AreaOutputPort', true, 'CentroidOutputPort', true, ...
 % % %             'MinimumBlobArea', 400);
@@ -182,11 +188,13 @@ end
         
         % Detect foreground.
         mask = obj.detector.step(frame);
+%         mask = obj.detector.step(rgb2gray(frame));
+%         mask(mask<0.5) = 0.0;
         
         % Apply morphological operations to remove noise and fill in holes.
-        mask = imopen(mask, strel('rectangle', [3,3]));
-        mask = imclose(mask, strel('rectangle', [15, 15])); 
-        mask = imfill(mask, 'holes');
+%         mask = imopen(mask, strel('rectangle', [3,3]));
+%         mask = imclose(mask, strel('rectangle', [15, 15])); 
+%         mask = imfill(mask, 'holes');
         
         % Perform blob analysis to find connected components.
         [~, centroids, bboxes] = obj.blobAnalyser.step(mask);
