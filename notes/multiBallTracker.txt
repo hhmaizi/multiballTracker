@@ -1,0 +1,24 @@
+setupSystemObjects()
+explaination:
+一、 Create System Objects
+	1. 设置视频读写环境
+	2. 设置ForegroundDetector参数
+	3. 设置BlobAnalysis参数
+二、 Initialize Tracks
+	1. tracks structures: id, bbox, kalmanFilter, age, totalVisibleCount, 
+	consecutiveInvisibleCount
+三、 Detect Objects
+	1. motion segmentation using foreground detector.
+	2. morphological operations
+	3. blobAnalyser
+四、Predict New Locations of Existing Tracks
+五、Assign Detections to Tracks
+六、update Assigned Tracks
+七、update Unassigned Tracks
+八、Delete Lost Tracks
+九、Create New Tracks
+十、Display Tracking Results
+	
+	
+
+	
