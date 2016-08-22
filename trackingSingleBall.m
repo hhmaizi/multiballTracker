@@ -1,28 +1,83 @@
+%% Using Kalman Filter for Single Ball Tracking
+% This example shows how to use the |vision.KalmanFilter| object and
+% |configureKalmanFilter| function to track objects.
+function trackingSingleBall()
+%% Introduction
+% The Kalman filter has many uses, including applications in control,
+% navigation, computer vision, and time series econometrics. This example
+% illustrates how to use the Kalman filter for tracking objects and focuses
+% on three important features:
 
 %%
+% * Prediction of object's future location
+% * Reduction of noise introduced by inaccurate detections
+% * Facilitating the process of association of multiple objects to their
+%   tracks
+
+%% Challenges of Object Tracking
+% Before showing the use of Kalman filter, let us first examine the
+% challenges of tracking an object in a video. The following video shows a
+% green ball moving from left to right on the floor.
+% showDetections();
+
+%%
+% The white region over the ball highlights the pixels detected using
+% |vision.ForegroundDetector|, which separates moving objects from the
+% background. The background subtraction only finds a portion of the ball
+% because of the low contrast between the ball and the floor. In other
+% words, the detection process is not ideal and introduces noise.
+%
+% To easily visualize the entire object trajectory, we overlay all video
+% frames onto a single image. The "+" marks indicate the centroids computed
+% using blob analysis.
+% showTrajectory();
+
+%%
+% Two issues can be observed:
+
+%%
+% # The region's center is usually different from the ball's center. In
+%   other words, there is an error in the measurement of the ball's
+%   location.
+% # The location of the ball is not available when it is occluded by the
+%   box, i.e. the measurement is missing.
+
+%%
+% Both of these challenges can be addressed by using the Kalman filter.
+
+%% Track a Single Object Using Kalman Filter
+% Using the video which was seen earlier, the |trackSingleObject| function
+% shows you how to:
+
+%% 
+% * Create |vision.KalmanFilter| by using |configureKalmanFilter|
+% * Use |predict| and |correct| methods in a sequence to eliminate noise
+%   present in the tracking system
+% * Use |predict| method by itself to estimate ball's location when
+%   it is occluded by the box
+%
+% The selection of the Kalman filter parameters can be challenging. The
+% |configureKalmanFilter| function helps simplify this problem. More
+% details about this can be found further in the example.
+
+%%
+% The |trackSingleObject| function includes nested helper functions. The
+% following top-level variables are used to transfer the data between the
+% nested functions.  
 frame            = [];  % A video frame
 detectedLocation = [];  % The detected location
 trackedLocation  = [];  % The tracked location
 label            = '';  % Label for the ball
 utilities        = [];  % Utilities used to process the video
 
-
-param = getDefaultParameters();         % get parameters that work well
-param.motionModel = 'ConstantVelocity'; % switch from ConstantAcceleration
-                                        % to ConstantVelocity
-% After switching motion models, drop noise specification entries
-% corresponding to acceleration.
-param.initialEstimateError = param.initialEstimateError(1:2);
-param.motionNoise          = param.motionNoise(1:2);
-
-trackSingleObject(param); % visualize the results
-
 %%
 % The procedure for tracking a single object is shown below.
 function trackSingleObject(param)
   % Create utilities used for reading video, detecting moving objects,
   % and displaying the results.
-  utilities = createUtilities(param);
+%   utilities = createUtilities(param);
+% %   utilities.blobAnalyzer = vision.BlobAnalysis('AreaOutputPort', false, ...
+% %     'MinimumBlobArea', 200, 'CentroidOutputPort', true);
 
   isTrackInitialized = false;
   while ~isDone(utilities.videoReader)
@@ -63,55 +118,34 @@ function trackSingleObject(param)
       end
     end
 
-    annotateTrackedObject();
+    annotateTrackedObject();    
+    
   end % while
   
   showTrajectory();
 end
 
+%% 
+% There are two distinct scenarios that the Kalman filter addresses:
 
 %%
-% Notice that the ball emerged in a spot that is quite different from the
-% predicted location. From the time when the ball was released, it was
-% subject to constant deceleration due to resistance from the carpet.
-% Therefore, constant acceleration model was a better choice. If you kept
-% the constant velocity model, the tracking results would be sub-optimal no
-% matter what you selected for the other values.
+% * When the ball is detected, the Kalman filter first predicts its state
+%   at the current video frame, and then uses the newly detected object
+%   location to correct its state. This produces a filtered location.
+% * When the ball is missing, the Kalman filter solely relies on its
+%   previous state to predict the ball's current location.
 
 %%
-% Typically, you would set the *InitialLocation* input to the location
-% where the object was first detected. You would also set the
-% *InitialEstimateError* vector to large values since the initial state may
-% be very noisy given that it is derived from a single detection. The
-% following figure demonstrates the effect of misconfiguring these
-% parameters.
-
-param = getDefaultParameters();  % get parameters that work well
-param.initialLocation = [0, 0];  % location that's not based on an actual detection 
-param.initialEstimateError = 100*ones(1,3); % use relatively small values
-
-trackSingleObject(param); % visualize the results
-
-%%
-% With the misconfigured parameters, it took a few steps before the
-% locations returned by the Kalman filter align with the actual trajectory
-% of the object.
-
-%%
-% The values for *MeasurementNoise* should be selected based on the
-% detector's accuracy. Set the measurement noise to larger values for a
-% less accurate detector. The following example illustrates the noisy
-% detections of a misconfigured segmentation threshold. Increasing the
-% measurement noise causes the Kalman filter to rely more on its internal
-% state rather than the incoming measurements, and thus compensates for the
-% detection noise.
-
-param = getDefaultParameters();
-param.segmentationThreshold = 0.0005; % smaller value resulting in noisy detections
-param.measurementNoise      = 12500;  % increase the value to compensate 
-                                      % for the increase in measurement noise
-
-trackSingleObject(param); % visualize the results
+% You can see the ball's trajectory by overlaying all video frames.
+param = getDefaultParameters();  % get Kalman configuration that works well
+                                 % for this example   
+                                 
+param.VideoOut = true;
+utilities = createUtilities(param);
+% utilities.blobAnalyzer = vision.BlobAnalysis('AreaOutputPort', false, ...
+%     'MinimumBlobArea', 200, 'CentroidOutputPort', true);
+                                 
+trackSingleObject(param);  % visualize the results
 
 %%
 % Typically objects do not move with constant acceleration or constant
@@ -172,6 +206,7 @@ function param = getDefaultParameters
   param.motionNoise           = [25, 10, 1];
   param.measurementNoise      = 25;
   param.segmentationThreshold = 0.05;
+%   param.segmentationThreshold = 30*30;
 end
 
 %%
@@ -211,6 +246,7 @@ end
 % Detect the ball in the current video frame.
 function [detection, isObjectDetected] = detectObject(frame)
   grayImage = rgb2gray(frame);
+  grayImage(grayImage<0.5) = 0; % 添加灰度变换过滤噪声
   utilities.foregroundMask = step(utilities.foregroundDetector, grayImage);
   detection = step(utilities.blobAnalyzer, utilities.foregroundMask);
   if isempty(detection)
@@ -238,6 +274,10 @@ function annotateTrackedObject()
       region, {label}, 'Color', 'red');
   end
   step(utilities.videoPlayer, combinedImage);
+  % if needed write the annotated video to out.avi
+    if param.VideoOut
+        step(utilities.videoWriter, combinedImage);
+    end
 end
 
 %%
@@ -287,8 +327,13 @@ end
 function utilities = createUtilities(param)
   % Create System objects for reading video, displaying video, extracting
   % foreground, and analyzing connected components.
-  utilities.videoReader = vision.VideoFileReader('singleball.avi');
+  path = 'E:\repository\datas\videos\3glasses\';
+  utilities.videoReader = vision.VideoFileReader([path 'occ-line03.mp4']);
   utilities.videoPlayer = vision.VideoPlayer('Position', [100,100,500,400]);
+  if param.VideoOut
+    utilities.videoWriter = vision.VideoFileWriter('out.avi', ...
+            'FrameRate', utilities.videoReader.info.VideoFrameRate);    
+  end
   utilities.foregroundDetector = vision.ForegroundDetector(...
     'NumTrainingFrames', 10, 'InitialVariance', param.segmentationThreshold);
   utilities.blobAnalyzer = vision.BlobAnalysis('AreaOutputPort', false, ...
@@ -302,3 +347,15 @@ end
 displayEndOfDemoMessage(mfilename)
 
 end
+
+%%
+%   Example: Track an occluded object
+%   ---------------------------------
+% param.motionModel           = 'ConstantAcceleration';
+%   param.initialLocation       = 'Same as first detection';
+%   param.initialEstimateError  = 1E5 * ones(1, 3);
+%   param.motionNoise           = [25, 10, 1];
+%   param.measurementNoise      = 25;
+%   param.segmentationThreshold = 0.05;
+
+

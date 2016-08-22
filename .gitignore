@@ -17,3 +17,10 @@ slprj/
 
 # Session info
 octave-workspace
+
+# videos
+*.avi
+videos/
+
+# junky files
+/junkies
